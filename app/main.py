@@ -59,3 +59,7 @@ class Dictionary:
 
     def __len__(self) -> int:
         return self.length
+
+
+if __name__ == "__main__":
+    d = Dictionary()
