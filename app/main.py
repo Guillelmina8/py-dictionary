@@ -1,64 +1,80 @@
+from dataclasses import dataclass, field
 from typing import Any, Hashable
 
 
+@dataclass(slots=True)
+class Node:
+    key: Hashable
+    value: Any
+    hash: int = field(init=False)
+    def __post_init__(self):
+        self.hash = hash(self.key)
+
+
 class Dictionary:
-    def __init__(self) -> None:
-        self.capacity = 8
-        self.length = 0
-        self.hash_table = [None] * self.capacity
-        self.load_factor = 0.75
+    LOAD_FACTOR = 2 / 3
+    INITIAL_CAPACITY = 8
+    CAPACITY_MULTIPLIER = 2
 
-    def __setitem__(self, key: Hashable, value: Any) -> None:
-        try:
-            key_hash = hash(key)
-        except TypeError:
-            raise TypeError("unhashable type")
-        if self.length >= self.capacity * 0.75:
-            self._resize()
-        index = key_hash % self.capacity
-        if self.hash_table[index] is None:
-            self.hash_table[index] = [[key_hash, key, value]]
-            self.length += 1
-            return
-        for obj in self.hash_table[index]:
-            if obj[1] == key:
-                obj[2] = value
+    def __init__(self):
+        self._capacity = self.INITIAL_CAPACITY
+        self._hash_table: list[None | Node] = [None] * self._capacity
+        self._size = 0
+
+    def _linear_probing(self, index: int) -> int:
+        return (index + 1) % self._capacity
+
+    def _calculate_index(self, key: Hashable):
+        hash_value = hash(key)
+        mask = self._capacity - 1
+        index = hash_value & mask
+        # index = hash_key % self._capacity
+        while (
+                (node := self._hash_table[index]) is not None
+                and node.hash != hash_value
+                and node.key != key
+        ):
+            index = self._linear_probing(index)
+        return index
+
+    @property
+    def _threshold(self) -> float:
+        return self._capacity * self.LOAD_FACTOR
+
+    def _need_resize(self):
+        return self._size + 1 > self._threshold
+
+    def _resize(self):
+        print("RESIZE CALLED !")
+        old_table = self._hash_table
+        self._capacity *= self.CAPACITY_MULTIPLIER
+        self._size = 0
+        self._hash_table = [None] * self._capacity
+        for node in old_table:
+            if node:
+                self[node.key] = node.value
+                # the same self.__setitem__(key=node.key, value=node.value)
+
+    def __setitem__(self, key: Hashable, value: Any):
+        index = self._calculate_index(key)
+        if (node := self._hash_table[index]) is not None:
+            node.value = value
+        else:
+            if self._need_resize():
+                self._resize()
+                self[key] = value  # the same self.__setitem__(key=key, value=value)
                 return
-
-        self.hash_table[index].insert(0, [key_hash, key, value])
-        self.length += 1
-        return None
-
-    def _resize(self) -> None:
-        self.capacity *= 2
-        old = self.hash_table
-        new_hash_table = [None] * self.capacity
-        for bucket in old:
-            if bucket is None:
-                continue
-            for node in bucket:
-                new_index = node[0] % self.capacity
-                if new_hash_table[new_index] is None:
-                    new_hash_table[new_index] = [node]
-                else:
-                    new_hash_table[new_index].insert(0, node)
-        self.hash_table = new_hash_table
+            self._size += 1
+            self._hash_table[index] = Node(key=key, value=value)
 
     def __getitem__(self, key: Hashable) -> Any:
-        key_hash = hash(key)
-        index = key_hash % self.capacity
+        index = self._calculate_index(key)
+        if (node := self._hash_table[index]) is None:
+            raise KeyError(f"Key: {key} not found")
+        return node.value
 
-        obj = self.hash_table[index]
-        if obj is None:
-            raise KeyError
-        for item in obj:
-            if item[0] == key_hash and item[1] == key:
-                return item[2]
-        else:
-            raise KeyError(f"Key {key} not found.")
-
-    def __len__(self) -> int:
-        return self.length
+    def __len__(self):
+        return self._size
 
 
 if __name__ == "__main__":
