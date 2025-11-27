@@ -29,11 +29,10 @@ class Dictionary:
         hash_value = hash(key)
         mask = self._capacity - 1
         index = hash_value & mask
-        # index = hash_key % self._capacity
         while (
                 (node := self._hash_table[index]) is not None
-                and node.hash_ != hash_value
-                and node.key != key
+                and (node.hash_ != hash_value
+                     or node.key != key)
         ):
             index = self._linear_probing(index)
         return index
